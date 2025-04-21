@@ -1,0 +1,36 @@
+
+pipeline:
+  name: "grounded_sam_2"
+  components:
+    - grounding_dino
+    - sam2
+
+
+
+image_folder: "/home/neptune/Data/HO3Dv2/evaluation/SM1/rgb"
+output_dir: "/home/neptune/Data/HO3Dv2/evaluation/SM1/bottle_mask"
+text_prompt: "bottle."
+
+
+
+grounding_dino:
+  model_id: "IDEA-Research/grounding-dino-tiny"
+  box_threshold: 0.4
+  text_threshold: 0.3
+  device: "auto"
+
+sam2:
+  checkpoint: "/home/neptune/Projects/AstraRobotVisionInfra/models/GroundedSAM2/checkpoints/sam2.1_hiera_large.pt"
+  model_config: "configs/sam2.1/sam2.1_hiera_l.yaml"
+  multimask_output: false
+  device: "auto"
+
+preprocessing:
+  input_size: [1024, 1024]
+  normalization:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+
+postprocessing:
+  mask_combine_method: "logical_or"
+  output_format: "png"

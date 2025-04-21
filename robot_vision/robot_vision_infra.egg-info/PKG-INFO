@@ -1,0 +1,362 @@
+Metadata-Version: 2.4
+Name: robot_vision_infra
+Version: 0.1.0
+Summary: Robot Vision Infrastructure
+Author: Xiangyu Han
+Author-email: xiangyu.han@quantgroup.com
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: opencv-python
+Requires-Dist: hydra-core
+Requires-Dist: transformers
+Requires-Dist: accelerate
+Requires-Dist: matplotlib
+Requires-Dist: scikit-learn
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# AstraRobotVisionInfra Codebase Documentation
+
+## Project Overview
+AstraRobotVisionInfra is a robotic vision infrastructure project that provides integration and unified interfaces for various vision foundation models. The project supports several advanced vision models, including DINOv2 (for visual feature extraction) and GroundedSAM2 (for image segmentation), and offers standardized processing pipelines.
+
+## Installation and Setup
+
+### 1. Requirements
+- Python 3.10
+- CUDA 11.8
+- 24GB+ GPU memory
+- 32GB+ RAM
+
+### 2. Installation Steps
+```bash
+# Create env
+conda create -n AstraVision python=3.10
+conda activate AstraVision
+
+# Install requirements
+pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+
+# Install GroundedSAM2
+cd models/GroundedSAM2
+pip install -e .
+cd ../..
+```
+
+### 3. Download Model Checkpoints
+The project requires pre-trained model checkpoints, which need to be downloaded separately.
+
+##### For GroundedSAM2:
+```bash
+# Create checkpoints directory
+mkdir -p models/GroundedSAM2/checkpoints
+
+# Download SAM2 checkpoint
+wget -P models/GroundedSAM2/checkpoints/ https://dl.fbaipublicfiles.com/segment_anything/sam2/sam2.1_hiera_large.pt
+```
+
+Note: The Grounding DINO model will be automatically downloaded from Hugging Face when first used.
+
+### 4. Verification
+
+To verify that the installation works correctly, run one of the example scripts:
+
+```bash
+python examples/run_groundedSAM.py
+```
+
+This should process the image specified in your configuration file and display the results with bounding boxes and segmentation masks.
+
+## Project Structure
+```
+AstraRobotVisionInfra/
+├── adapters/               # Model adapters for unifying different model interfaces
+│   ├── base_adapter.py     # Base adapter class
+│   ├── dino_adapter.py     # DINOv2 model adapter
+│   └── groundedSAM_adapter.py # GroundedSAM2 model adapter
+├── config/                 # Configuration file directory
+│   └── groundedSAM.yaml    # GroundedSAM2 model configuration file
+├── core/                   # Core functionality implementation
+│   ├── interfaces.py       # Interface definitions
+│   └── model_factory.py    # Model factory for creating model instances
+├── examples/               # Example code
+│   └── run_groundedSAM.py  # GroundedSAM2 usage example
+├── models/                 # Model implementation directory
+│   ├── dinov2/             # DINOv2 model implementation
+│   └── GroundedSAM2/       # GroundedSAM2 model implementation
+├── pipelines/              # Processing pipeline implementation
+│   ├── image_preprocessor.py # Image preprocessing
+│   └── post_processor.py     # Result post-processing
+└── utils/                  # Utility functions
+```
+
+## Core Components
+
+### 1. Model Factory (core/model_factory.py)
+The model factory provides a unified interface for model creation, supporting the following model types:
+- `dino`: Creates a DINOv2 model instance for feature extraction
+- `sam`: Creates a GroundedSAM2 model instance for image segmentation
+
+The model factory is implemented using a simple factory pattern, creating appropriate adapter instances based on the specified model type:
+
+```python
+from core.model_factory import ModelFactory
+
+# Create a DINOv2 model
+dino_model = ModelFactory.create('dino', config={})
+
+# Create a GroundedSAM2 model
+sam_model = ModelFactory.create('sam', config={})
+```
+
+### 2. Adapter Layer (adapters/)
+The adapter layer is the core of the project, providing a unified interface that allows different models to be called in the same way. All adapters inherit from the base adapter class `BaseAdapter`.
+
+#### 2.1 Base Adapter (base_adapter.py)
+Defines the basic interfaces and common functionality for all adapters:
+```python
+class BaseAdapter(ABC):
+    """Base adapter class for all adapters"""
+    def __init__(self, config: dict):
+        self.config = config
+        
+    def to_device(self, device: str):
+        if hasattr(self.original, 'to'):
+            self.original.to(device)
+        return self
+```
+
+#### 2.2 DINOv2 Adapter (dino_adapter.py)
+Encapsulates the functionality of the DINOv2 model, providing a feature extraction interface:
+```python
+class DINOAdapter(BaseAdapter):
+    """Adapter for DINO models"""
+    def __init__(self, original_model, config: dict):
+        super().__init__(original_model, config)
+        # Initialize DINO model
+        
+    def extract(self, image):
+        """Extract features from an image"""
+        # Extract features
+        # Return features
+```
+
+#### 2.3 GroundedSAM2 Adapter (groundedSAM_adapter.py)
+Encapsulates the functionality of the GroundedSAM2 model, providing an image segmentation interface:
+```python
+class GroundedSAMAdapter(BaseAdapter):
+    """Adapter for Grounded SAM models"""
+    def __init__(self, config: dict):
+        super().__init__(config)
+        # Initialize GroundedSAM2 and GroundingDINO models
+        
+    def segment(self, image):
+        """Segment an image"""
+        # Use GroundingDINO to detect objects
+        # Use SAM2 for segmentation
+        # Return segmentation mask, bounding boxes, and class names
+```
+
+### 3. Processing Pipelines (pipelines/)
+The project contains two main processing pipeline components:
+
+#### 3.1 Image Preprocessing (image_preprocessor.py)
+Provides functionality to convert input images to the formats required by different models:
+```python
+class img_preprocessor():
+    @staticmethod
+    def to_dino_format(image):
+        """Transform input image to the format that the DINO model expects"""
+        # Preprocess image
+        return image
+    
+    @staticmethod
+    def to_groundedSAM_format(image):
+        """Transform input image to the format that the GroundedSAM model expects"""
+        # Preprocess image
+        return image
+```
+
+#### 3.2 Post-processing (post_processor.py)
+Provides functionality to convert raw model outputs to the standard format expected by the system:
+```python
+class postprocessor():
+    @staticmethod
+    def to_dino_format(raw_features):
+        """Transform raw features to the format that the rest of the system expects"""
+        # Post-process image
+        return raw_features
+        
+    @staticmethod
+    def to_groundedSAM_format(masks):
+        """Transform raw masks to the format that the rest of the system expects"""
+        # Post-process image
+        return masks
+```
+
+## Configuration System
+
+### Configuration File Format
+The project uses YAML format configuration files located in the `config/` directory. Using `groundedSAM.yaml` as an example:
+
+```yaml
+pipeline:
+  name: "grounded_sam_2"
+  components:
+    - grounding_dino
+    - sam2
+
+image_path: "/path/to/image.jpg"
+output_dir: "/path/to/output"
+text_prompt: "person. rider. car. truck. bus. train. motorcycle. bicycle."
+
+grounding_dino:
+  model_id: "IDEA-Research/grounding-dino-tiny"
+  box_threshold: 0.4
+  text_threshold: 0.3
+  device: "auto"
+
+sam2:
+  checkpoint: "/path/to/checkpoint.pt"
+  model_config: "configs/sam2.1/sam2.1_hiera_l.yaml"
+  multimask_output: false
+  device: "auto"
+
+preprocessing:
+  input_size: [1024, 1024]
+  normalization:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+
+postprocessing:
+  mask_combine_method: "logical_or"
+  output_format: "png"
+```
+
+### Configuration Parameters
+
+#### General Configuration
+- `pipeline.name`: Processing pipeline name
+- `pipeline.components`: Components used in the processing pipeline
+- `image_path`: Input image path
+- `output_dir`: Output directory path
+- `text_prompt`: Text prompt used to specify target classes for detection and segmentation
+
+#### GroundingDINO Configuration
+- `model_id`: Model ID, using Hugging Face model
+- `box_threshold`: Bounding box detection threshold
+- `text_threshold`: Text matching threshold
+- `device`: Running device, options include "cuda", "cpu", or "auto"
+
+#### SAM2 Configuration
+- `checkpoint`: Model checkpoint path
+- `model_config`: Model configuration file path
+- `multimask_output`: Whether to output multiple masks
+- `device`: Running device
+
+#### Preprocessing and Post-processing Configuration
+- `preprocessing.input_size`: Input image size
+- `preprocessing.normalization`: Image normalization parameters
+- `postprocessing.mask_combine_method`: Mask combining method
+- `postprocessing.output_format`: Output format
+
+
+## Development Guide
+
+### Adding New Models
+1. Create new model implementation in the `models/` directory
+2. Create corresponding adapter in the `adapters/` directory, inheriting from the `BaseAdapter` class
+3. Implement main methods of the adapter
+4. Register the new model in `core/model_factory.py`
+5. Add corresponding preprocessing and post-processing functions in the `pipelines/` directory
+
+Example: Adding CLIP (Contrastive Language-Image Pre-training) model
+
+```python
+# 1. Create adapter (adapters/clip_adapter.py)
+from .base_adapter import BaseAdapter
+
+class CLIPAdapter(BaseAdapter):
+    def __init__(self, config: dict):
+        super().__init__(config)
+        # Initialize CLIP model from transformers library
+        self.model = CLIPModel.from_pretrained(config['model_id'])
+        self.processor = CLIPProcessor.from_pretrained(config['model_id'])
+        
+    def compute_similarity(self, image, text_queries):
+        """Compute similarity between image and text queries"""
+        # Process inputs
+        inputs = self.processor(images=image, text=text_queries, return_tensors="pt")
+        # Get similarity scores
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            scores = outputs.logits_per_image
+        return scores
+
+# 2. Register in model factory (core/model_factory.py)
+elif model_type == 'clip':
+    return CLIPAdapter(config)
+
+# 3. Add preprocessing/postprocessing functions (pipelines/*)
+# pipelines/post_processor.py
+@staticmethod
+def to_clip_format(features):
+    """Format CLIP outputs"""
+    return features.cpu().numpy()
+```
+
+### Example Usage for New Model
+
+```python
+# Example usage of CLIP adapter
+from core.model_factory import ModelFactory
+from PIL import Image
+
+# Configuration
+config = {
+    'model_id': 'openai/clip-vit-base-patch32',
+    'device': 'cuda'
+}
+
+# Create model and use it
+clip_model = ModelFactory.create('clip', config)
+image = Image.open('example.jpg')
+text_queries = ["a photo of a dog", "a photo of a cat"]
+similarities = clip_model.compute_similarity(image, text_queries)
+print(f"Most likely: {text_queries[similarities.argmax().item()]}")
+```
+
+### Integration Workflow
+
+Integration of new vision models follows these key steps:
+
+1. **Model Implementation**: Place model code in `models/` directory
+   
+2. **Adapter Creation**: Create adapter in `adapters/` inheriting from `BaseAdapter`
+   
+3. **Factory Registration**: Add model type to `core/model_factory.py`
+   
+4. **Pipeline Integration**: Add pre/post processing methods in `pipelines/`
+   
+5. **Configuration**: Create YAML config in `config/` directory
+   
+6. **Example**: Add usage example in `examples/` directory
+
+This modular architecture ensures seamless integration while maintaining compatibility.
+
+## Future Plans
+1. Add support for more models
+2. Add more preprocessing and post-processing options
+3. Provide more examples and tutorials
+4. Host the model with Triton
+
