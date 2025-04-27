@@ -179,9 +179,9 @@ def write_in_image_geo_pairs(imgs_geo_path, sample_token_to_geo):
 
 def main():
     # The "version" variable is the name of the folder holding all .json metadata tables.
-    nusc = NuScenes(version='v1.1', dataroot=f'./location_43/43', verbose=True)
+    nusc = NuScenes(version='v1.1', dataroot=f'/home/neptune/Data/MARS/raw_data/loc17/17', verbose=True)
 
-    output_dir = './location_43/downsampled_multitraversal/test'
+    output_dir = '/home/neptune/Data/MARS/city_gs_data/loc17_test'
     traversal_idxes = list(range(0, 150))
     testset_idx = []
 

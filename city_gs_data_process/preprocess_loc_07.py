@@ -17,73 +17,169 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 
-def get_dynamic_point_mask(points_world, R_cw, t_cw, K, mask_img):
-    """
-    计算哪些世界坐标下的点投影到 mask=1 区域。
+# def get_dynamic_point_mask(points_world, R_wc, t_wc, K, mask_img):
+#     """
+#     计算哪些世界坐标下的点投影到 mask=1 区域。
 
-    Args:
-        points_world: (N,3) np.ndarray，世界系点云
-        R_cw: (3,3) np.ndarray，世界->相机旋转矩阵
-        t_cw: (3,)  np.ndarray，世界->相机平移向量
-        K:     (3,3) np.ndarray，相机内参矩阵
-        mask_img: (H,W) 二值掩码，动态物体区域=1
-    Returns:
-        dynamic_mask: (N,) bool 数组，True 表示该点投影到动态区域
-    """
-    # 1. 变换到相机系
-    pts_cam = (R_cw @ points_world.T + t_cw[:, None]).T
-    z = pts_cam[:, 2]
-    valid = z > 0
+#     Args:
+#         points_world: (N,3) np.ndarray，世界系点云
+#         R_wc: (3,3) np.ndarray，世界->相机旋转矩阵
+#         t_wc: (3,)  np.ndarray，世界->相机平移向量
+#         K:     (3,3) np.ndarray，相机内参矩阵
+#         mask_img: (H,W) 二值掩码，动态物体区域=1
+#     Returns:
+#         dynamic_mask: (N,) bool 数组，True 表示该点投影到动态区域
+#     """
+#     # 1. 变换到相机系
+#     pts_cam = (R_wc @ points_world.T + t_wc[:, None]).T
+#     z = pts_cam[:, 2]
+#     valid = z > 0
 
-    # 2. 投影到像素平面
-    proj = (K @ pts_cam[valid].T).T
-    u = proj[:,0] / proj[:,2]
-    v = proj[:,1] / proj[:,2]
-    u_i = np.round(u).astype(int)
-    v_i = np.round(v).astype(int)
+#     # 2. 投影到像素平面
+#     proj = (K @ pts_cam[valid].T).T
+#     u = proj[:,0] / proj[:,2]
+#     v = proj[:,1] / proj[:,2]
+#     u_i = np.round(u).astype(int)
+#     v_i = np.round(v).astype(int)
 
-    H, W = mask_img.shape[:2]
-    in_bounds = (u_i>=0)&(u_i<W)&(v_i>=0)&(v_i<H)
+#     H, W = mask_img.shape[:2]
+#     in_bounds = (u_i>=0)&(u_i<W)&(v_i>=0)&(v_i<H)
 
-    dynamic = np.zeros(points_world.shape[0], dtype=bool)
-    idx_valid = np.nonzero(valid)[0]
-    good_idx = idx_valid[in_bounds]
-    dynamic_vals = mask_img[v_i[in_bounds], u_i[in_bounds]] > 0
-    dynamic[good_idx] = dynamic_vals
+#     dynamic = np.zeros(points_world.shape[0], dtype=bool)
+#     idx_valid = np.nonzero(valid)[0]
+#     good_idx = idx_valid[in_bounds]
+#     dynamic_vals = mask_img[v_i[in_bounds], u_i[in_bounds]] > 0
+#     dynamic[good_idx] = dynamic_vals
 
-    return dynamic
+#     return dynamic
+
+# def filter_lidar_points(points_world, cam_params_list, masks_list):
+#     """
+#     用多视角 mask 过滤掉动态点。
+
+#     Args:
+#         points_world: (N,3) np.ndarray，世界系 LiDAR 点
+#         cam_params_list: list of dict，每个 dict 包含
+#             {
+#               'R_wc': np.ndarray (3,3),
+#               't_wc': np.ndarray (3,),
+#               'K':    np.ndarray (3,3)
+#             }
+#         masks_list: list of np.ndarray (H,W)，对应每个视角的二值掩码
+#     Returns:
+#         points_static: (M,3) np.ndarray，过滤掉动态点后的点云
+#     """
+#     N = points_world.shape[0]
+#     all_dynamic = np.zeros(N, dtype=bool)
+
+#     for params, mask in zip(cam_params_list, masks_list):
+#         dyn = get_dynamic_point_mask(
+#             points_world,
+#             params['R_wc'],
+#             params['t_wc'],
+#             params['K'],
+#             mask
+#         )
+#         all_dynamic |= dyn
+
+#     return points_world[~all_dynamic]
+
 
 def filter_lidar_points(points_world, cam_params_list, masks_list):
     """
-    用多视角 mask 过滤掉动态点。
+    用多视角 mask 过滤 LiDAR 点，只保留落在任一相机视野内且不在动态区域的点。
 
     Args:
         points_world: (N,3) np.ndarray，世界系 LiDAR 点
         cam_params_list: list of dict，每个 dict 包含
             {
-              'R_cw': np.ndarray (3,3),
-              't_cw': np.ndarray (3,),
-              'K':    np.ndarray (3,3)
+              'R_wc': np.ndarray (3,3),  # 世界->相机 旋转
+              't_wc': np.ndarray (3,),   # 世界->相机 平移
+              'K':    np.ndarray (3,3)   # 相机内参
             }
-        masks_list: list of np.ndarray (H,W)，对应每个视角的二值掩码
+        masks_list: list of np.ndarray (H,W)，对应每个视角的二值动态 mask
     Returns:
-        points_static: (M,3) np.ndarray，过滤掉动态点后的点云
+        points_static: (M,3) np.ndarray，只保留可见且静态的点
     """
     N = points_world.shape[0]
-    all_dynamic = np.zeros(N, dtype=bool)
+    keep = np.zeros(N, dtype=bool)
 
-    for params, mask in zip(cam_params_list, masks_list):
-        dyn = get_dynamic_point_mask(
-            points_world,
-            params['R_cw'],
-            params['t_cw'],
-            params['K'],
-            mask
-        )
-        all_dynamic |= dyn
+    for params, mask_img in zip(cam_params_list, masks_list):
+        R_wc = params['R_wc']
+        t_wc = params['t_wc']
+        K     = params['K']
 
-    return points_world[~all_dynamic]
+        # 1. 投影前变换到相机系
+        pts_cam = (R_wc @ points_world.T + t_wc[:, None]).T
+        z = pts_cam[:, 2]
+        valid = z > 0  # 只看相机前方
+        if not np.any(valid):
+            continue
 
+        # 2. 投影到像素平面
+        proj = (K @ pts_cam[valid].T).T
+        u = proj[:, 0] / proj[:, 2]
+        v = proj[:, 1] / proj[:, 2]
+        u_i = np.round(u).astype(int)
+        v_i = np.round(v).astype(int)
+
+        H, W = mask_img.shape[:2]
+        in_bounds = (u_i >= 0) & (u_i < W) & (v_i >= 0) & (v_i < H)
+        if not np.any(in_bounds):
+            continue
+
+        # 3. 对应原始点的索引
+        idx_valid = np.nonzero(valid)[0]
+        idx_in_bounds = idx_valid[in_bounds]
+
+        # 4. 动态检测：掩码中为 1 表示动态
+        dynamic_vals = (mask_img[v_i[in_bounds], u_i[in_bounds]] > 0)
+
+        # 5. 静态且可见的点
+        static_idx = idx_in_bounds[~dynamic_vals]
+        keep[static_idx] = True
+
+    return points_world[keep]
+
+
+def visualize_lidar_on_image(points3d: np.ndarray,
+                             R_wc: np.ndarray,
+                             t_wc: np.ndarray,
+                             K: np.ndarray,
+                             image: np.ndarray,
+                             save_path: str):
+    """
+    将 3D 点投影到图像上并保存。
+
+    Args:
+        points3d: (M,3) 世界系静态 LiDAR 点
+        R_cw:     (3,3) 世界->相机 旋转矩阵
+        t_cw:     (3,) 世界->相机 平移向量
+        K:        (3,3) 相机内参矩阵
+        image:    (H,W,3) 去畸变后的彩色图
+        save_path: 保存可视化结果的文件路径
+    """
+    h, w = image.shape[:2]
+    # 1. 世界->相机
+    pts_cam = (R_wc @ points3d.T + t_wc[:, None]).T
+    # 2. 只保留 z>0
+    mask_front = pts_cam[:,2] > 0
+    pts_cam = pts_cam[mask_front]
+    # 3. 投影
+    proj = (K @ pts_cam.T).T
+    u = proj[:,0] / proj[:,2]
+    v = proj[:,1] / proj[:,2]
+    # 4. 落在图像内部
+    valid = (u>=0)&(u<w)&(v>=0)&(v<h)
+    u = u[valid].astype(int)
+    v = v[valid].astype(int)
+    # 5. 画点
+    vis = image.copy()
+    for x,y in zip(u,v):
+        cv2.circle(vis, (x,y), 1, (0,0,255), -1)
+    # 6. 保存
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    cv2.imwrite(save_path, vis)
 
 
 def undistort_image(camera_matrix, distortion_coefficients, img):
@@ -138,7 +234,7 @@ def process_data(nusc, output_dir, trainset_idxes, testset_idxes,  train_sensors
     test_set_img_names = []
     train_set_img_names = []
     all_world_lidar_points = [] # Initialize list to collect all points
-    lidar_voxel_size = 0.5  # Voxel size for downsampling
+    lidar_voxel_size = 0.25  # Voxel size for downsampling
     for traversal_idx in merged_traversal_idxes:
         my_scene = nusc.scene[traversal_idx]
 
@@ -312,16 +408,16 @@ def process_data(nusc, output_dir, trainset_idxes, testset_idxes,  train_sensors
                     # Convert world to camera
                     cam_translation_world = ego_world_rotation_R.apply(cam_ego_translation) + ego_world_translation
                     cam_rotation_world = ego_world_rotation_R * cam_ego_rotation
-                    cam_rotation_cam = cam_rotation_world.inv()
-                    translation_camera = -cam_rotation_cam.apply(cam_translation_world)
+                    wolrd_cam_rotation = cam_rotation_world.inv()
+                    world_camera_translation = -wolrd_cam_rotation.apply(cam_translation_world)
 
                     # For visualization
-                    R_cw = cam_rotation_world.as_matrix()
-                    t_cw = cam_translation_world
+                    R_wc = wolrd_cam_rotation.as_matrix()
+                    t_wc = world_camera_translation
 
                     # Restore corresponding camera's poses
                     key = f"trav_{traversal_idx}_channel_{channel_idx}_img_{img_idx}"
-                    sample_token_to_cam_pose_in_cam_frame[key] = np.append(cam_rotation_cam.as_quat(scalar_first=True), translation_camera)    # key: {sample_token}_{camera_channel};    value: qw, qx, qy, qz, x,y,z
+                    sample_token_to_cam_pose_in_cam_frame[key] = np.append(wolrd_cam_rotation.as_quat(scalar_first=True), world_camera_translation)    # key: {sample_token}_{camera_channel};    value: qw, qx, qy, qz, x,y,z
                     sample_token_to_geo_in_cam_frame[key] = cam_translation_world    # key: {sample_token}_{camera_channel};    value: x,y,z
 
                     if len(images_list) == len(sensors):
@@ -351,8 +447,8 @@ def process_data(nusc, output_dir, trainset_idxes, testset_idxes,  train_sensors
 
                     # Used for mask lidar points
                     list_of_cam_rtks.append([
-                        R_cw,
-                        t_cw,
+                        R_wc,
+                        t_wc,
                         camera_intrinsic
                     ])
                     # Read mask image 
@@ -362,16 +458,36 @@ def process_data(nusc, output_dir, trainset_idxes, testset_idxes,  train_sensors
                 cam_params_list = []
                 masks_list = []
 
-                for (R_cw, t_cw, K), mask_img in zip(list_of_cam_rtks, list_of_masks):
+                for (R_wc, t_wc, K), mask_img in zip(list_of_cam_rtks, list_of_masks):
                     cam_params_list.append({
-                        'R_cw': R_cw,
-                        't_cw': t_cw,
+                        'R_wc': R_wc,
+                        't_wc': t_wc,
                         'K': K
                     })
                     masks_list.append(mask_img)
                 # print("cam_params_list is:", cam_params_list)
                 # 过滤
                 points_static = filter_lidar_points(points_downsampled, cam_params_list, masks_list)
+                debug_dir = os.path.join(output_dir, 'debug_lidar_vis')
+                debug_path = os.path.join(debug_dir, f'trav{traversal_idx}_idx{idx}_vis.jpg')
+                visualize_lidar_on_image(points_static,
+                                        cam_params_list[0]['R_wc'],
+                                        cam_params_list[0]['t_wc'],
+                                        cam_params_list[0]['K'],
+                                        images_list[0],
+                                        debug_path)
+                visualize_lidar_on_image(points_static,
+                                        cam_params_list[1]['R_wc'],
+                                        cam_params_list[1]['t_wc'],
+                                        cam_params_list[1]['K'],
+                                        images_list[1],
+                                        debug_path)
+                visualize_lidar_on_image(points_static,
+                                        cam_params_list[2]['R_wc'],
+                                        cam_params_list[2]['t_wc'],
+                                        cam_params_list[2]['K'],
+                                        images_list[2],
+                                        debug_path)
                 all_world_lidar_points.append(points_static)
 
             else:
@@ -514,11 +630,19 @@ def main():
     nusc = NuScenes(version='v1.1', dataroot=f'/home/neptune/Data/MARS/raw_data/loc7/7', verbose=True)
 
     # case 1 middle lane change
-    output_dir = '/home/neptune/Data/MARS/city_gs_data/loc07_single_trav_mask_lidar'
+    output_dir = '/home/neptune/Data/MARS/city_gs_data/loc07_single_trav_test'
     # trainset_idxes = [5,6,7,10,12,13] 
-    trainset_idxes = [6] 
-    testset_idxes = [] 
+
+    # # Three traversal
+    # trainset_idxes = [6, 7, 10] # Sample ratio 0.4
+    # train_sample_ratio = 0.4
+
+    # Single traversals
+    trainset_idxes = [6] # Sample ratio 1
     train_sample_ratio = 1
+
+
+    testset_idxes = [] 
     test_sample_ratio = 0
     train_sensors = [
             'CAM_FRONT_CENTER',
