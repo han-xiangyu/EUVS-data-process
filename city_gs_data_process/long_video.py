@@ -289,7 +289,6 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
 
     # Write key information
     key_info = {
-    "location_and_traversals": loc_and_traversals,
     "train_set_camera": train_sensors,
     "train_set_downsaple_ratio": train_sample_ratio,
     "number_of_train_set": len(sample_token_to_cam_pose_in_cam_frame)-len(test_set_img_names),
@@ -648,7 +647,7 @@ def main():
     # train_sample_ratio = 0.4
 
 
-    train_sample_ratio = 0.6
+    train_sample_ratio = 0.01
     test_sample_ratio = 0
 
     train_sensors = [
