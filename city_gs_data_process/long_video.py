@@ -1,7 +1,7 @@
 
 from nuscenes.nuscenes import NuScenes
 import cv2
-from utils import get_all_sample_tokens
+from city_gs_data_process.utils import get_all_sample_tokens
 import os
 import numpy as np
 from scipy.spatial.transform import Rotation as R
