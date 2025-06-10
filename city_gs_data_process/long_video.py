@@ -63,202 +63,200 @@ def process_data(output_dir, channel_to_idx, loc_and_traversals, train_sensors, 
     test_set_img_names = []
     train_set_img_names = []
 
-    # ------------- Loop each location -----------
-    for loc_id, train_and_test_traversal_idxes in loc_and_traversals.items():
-        print(f"Processing location {loc_id}...")
-        trainset_idxes, testset_idxes = train_and_test_traversal_idxes
-        merged_traversal_idxes = trainset_idxes + testset_idxes
-        nusc = NuScenes(version='v1.1', dataroot=f'/home/neptune/Data/MARS/raw_data/loc{loc_id}/{loc_id}', verbose=True)
+    trainset_idxes = [2]
+    testset_idxes = []
+    merged_traversal_idxes = trainset_idxes + testset_idxes
+    nusc = NuScenes(version='v1.1', dataroot=f'/lustre/fsw/portfolios/nvr/users/ymingli/xiangyu/data', verbose=True)
 
-        #  ----------- Loop each traversal -----------
-        for traversal_idx in merged_traversal_idxes:
-            my_scene = nusc.scene[traversal_idx]
+    #  ----------- Loop each traversal -----------
+    for traversal_idx in merged_traversal_idxes:
+        my_scene = nusc.scene[traversal_idx]
 
-            all_sample_tokens = get_all_sample_tokens(nusc,my_scene['token'])
-            
-            if traversal_idx in trainset_idxes:
-                sensors = train_sensors
-                TESTSET = False
-                sample_ratio = train_sample_ratio
-            else:
-                sensors = test_sensors
-                TESTSET = True
-                sample_ratio = test_sample_ratio
+        all_sample_tokens = get_all_sample_tokens(nusc,my_scene['token'])
+        
+        if traversal_idx in trainset_idxes:
+            sensors = train_sensors
+            TESTSET = False
+            sample_ratio = train_sample_ratio
+        else:
+            sensors = test_sensors
+            TESTSET = True
+            sample_ratio = test_sample_ratio
 
-            # Reset video writer for each traversal
-            video_writer = None
+        # Reset video writer for each traversal
+        video_writer = None
 
-            num_files = len(all_sample_tokens)
-            print("The number of samples in traversal ",traversal_idx," is: ",num_files)
-            skip_indices = np.linspace(0, num_files - 1, int(num_files * (1 - sample_ratio)), dtype=int)
+        num_files = len(all_sample_tokens)
+        print("The number of samples in traversal ",traversal_idx," is: ",num_files)
+        skip_indices = np.linspace(0, num_files - 1, int(num_files * (1 - sample_ratio)), dtype=int)
 
-            # ------------- Loop each frame -------------
-            for idx, sample_token in enumerate(tqdm(all_sample_tokens, desc="Samples", unit="sample")):
-                images_list = []
+        # ------------- Loop each frame -------------
+        for idx, sample_token in enumerate(tqdm(all_sample_tokens, desc="Samples", unit="sample")):
+            images_list = []
 
-                # ----------- Sample data in certain ratio -----------
-                if idx not in skip_indices: 
-                    img_idx = str(idx+1).zfill(3)
-                    sample_record = nusc.get("sample", sample_token)
+            # ----------- Sample data in certain ratio -----------
+            if idx not in skip_indices: 
+                img_idx = str(idx+1).zfill(3)
+                sample_record = nusc.get("sample", sample_token)
 
-                    # Get ego poses
-                    lidar_token = sample_record["data"]['LIDAR_FRONT_CENTER']
-                    lidar_sample_data = nusc.get("sample_data", lidar_token)
+                # Get ego poses
+                lidar_token = sample_record["data"]['LIDAR_FRONT_CENTER']
+                lidar_sample_data = nusc.get("sample_data", lidar_token)
 
-                    # Read lidar data and convert
-                    lidar_file_path, _, _ = nusc.get_sample_data(lidar_token)
-                    pc = LidarPointCloud.from_file(lidar_file_path)
+                # Read lidar data and convert
+                lidar_file_path, _, _ = nusc.get_sample_data(lidar_token)
+                pc = LidarPointCloud.from_file(lidar_file_path)
 
 
-                    # Lidar sensor -> vehicle
-                    cs_record = nusc.get('calibrated_sensor', lidar_sample_data['calibrated_sensor_token'])
-                    sensor_to_ego_trans = np.array(cs_record['translation'])
-                    sensor_to_ego_rot = np.array(cs_record['rotation'])
-                    sensor_to_ego_rot_R = R.from_quat(sensor_to_ego_rot, scalar_first=True)
+                # Lidar sensor -> vehicle
+                cs_record = nusc.get('calibrated_sensor', lidar_sample_data['calibrated_sensor_token'])
+                sensor_to_ego_trans = np.array(cs_record['translation'])
+                sensor_to_ego_rot = np.array(cs_record['rotation'])
+                sensor_to_ego_rot_R = R.from_quat(sensor_to_ego_rot, scalar_first=True)
 
-                    # Vehicle -> world
-                    pose_record = nusc.get('ego_pose', lidar_sample_data['ego_pose_token'])
-                    ego_world_translation = np.array(pose_record['translation'])
-                    ego_world_rotation = np.array(pose_record["rotation"])
-                    ego_world_rotation_R = R.from_quat(ego_world_rotation, scalar_first=True)
+                # Vehicle -> world
+                pose_record = nusc.get('ego_pose', lidar_sample_data['ego_pose_token'])
+                ego_world_translation = np.array(pose_record['translation'])
+                ego_world_rotation = np.array(pose_record["rotation"])
+                ego_world_rotation_R = R.from_quat(ego_world_rotation, scalar_first=True)
 
-                    # Apply transformation: vehicle -> sensor
-                    # LidarPointCloud embeds the method to rotate and translate the point cloud
-                    pc.rotate(sensor_to_ego_rot_R.as_matrix())
-                    pc.translate(sensor_to_ego_trans)
+                # Apply transformation: vehicle -> sensor
+                # LidarPointCloud embeds the method to rotate and translate the point cloud
+                pc.rotate(sensor_to_ego_rot_R.as_matrix())
+                pc.translate(sensor_to_ego_trans)
 
-                    # Apply transformation: sensor -> world
-                    pc.rotate(ego_world_rotation_R.as_matrix())
-                    pc.translate(ego_world_translation)
+                # Apply transformation: sensor -> world
+                pc.rotate(ego_world_rotation_R.as_matrix())
+                pc.translate(ego_world_translation)
 
-                    # Get points in world coordinates
-                    points_all = pc.points[:3, :].T 
+                # Get points in world coordinates
+                points_all = pc.points[:3, :].T 
 
-                    # <<< --- ADD DOWNSAMPLING STEP --- >>>
-                    points_downsampled = points_all # Initialize to original points
-                    if lidar_voxel_size > 0 and points_all.shape[0] > 0:
-                        try:
-                            # 1. Create Open3D PointCloud object
-                            pcd = o3d.geometry.PointCloud()
-                            pcd.points = o3d.utility.Vector3dVector(points_all)
-                            # 2. Apply Voxel Downsampling
-                            downsampled_pcd = pcd.voxel_down_sample(voxel_size=lidar_voxel_size)
-                            # 3. Convert back to NumPy array
-                            points_downsampled = np.asarray(downsampled_pcd.points)
+                # <<< --- ADD DOWNSAMPLING STEP --- >>>
+                points_downsampled = points_all # Initialize to original points
+                if lidar_voxel_size > 0 and points_all.shape[0] > 0:
+                    try:
+                        # 1. Create Open3D PointCloud object
+                        pcd = o3d.geometry.PointCloud()
+                        pcd.points = o3d.utility.Vector3dVector(points_all)
+                        # 2. Apply Voxel Downsampling
+                        downsampled_pcd = pcd.voxel_down_sample(voxel_size=lidar_voxel_size)
+                        # 3. Convert back to NumPy array
+                        points_downsampled = np.asarray(downsampled_pcd.points)
 
-                        except Exception as e:
-                            print(f"Error during downsampling: {e}. Using original points for this frame.")
-                            points_downsampled = points_all
-                    elif points_all.shape[0] == 0:
-                        print("Warning: No points found in original LiDAR data for this frame.")
-                        points_downsampled = points_all # Append empty array if it was empty
-                    # <<< --- END OF DOWNSAMPLING STEP --- >>>
-                    
-                    list_of_cam_parameters_per_frame = []
-                    list_of_masks_per_frame = []
+                    except Exception as e:
+                        print(f"Error during downsampling: {e}. Using original points for this frame.")
+                        points_downsampled = points_all
+                elif points_all.shape[0] == 0:
+                    print("Warning: No points found in original LiDAR data for this frame.")
+                    points_downsampled = points_all # Append empty array if it was empty
+                # <<< --- END OF DOWNSAMPLING STEP --- >>>
+                
+                list_of_cam_parameters_per_frame = []
+                list_of_masks_per_frame = []
 
-                    # --- Loop through each camera channel ---
-                    for sensor_channel in sensors:
-                        channel_idx = str(channel_to_idx[sensor_channel]).zfill(1)
-                        camera_token = sample_record['data'][sensor_channel]
-                        camera_data = nusc.get('sample_data', camera_token)
-                        image_path, boxes, _ = nusc.get_sample_data(camera_token)
-                        camera_intrinsic = nusc.get('calibrated_sensor', camera_data['calibrated_sensor_token'])['camera_intrinsic']
-                        distortion_coefficients = nusc.get('calibrated_sensor', camera_data['calibrated_sensor_token'])['distortion_coefficient']
-                        image_name = f"loc_{loc_id}_trav_{traversal_idx}_channel_{channel_idx}_img_{img_idx}.jpg"
-                        output_path = os.path.join(image_output_dir, image_name)
-                        if TESTSET:
-                            test_set_img_names.append(image_name)
-                        else:
-                            train_set_img_names.append(image_name)
-                            
-                        # ------------- Read and save the image and mask -------------
-                        if os.path.exists(image_path):
-                            with open(image_path, 'rb') as src_file:
-                                img_array = np.asarray(bytearray(src_file.read()), dtype=np.uint8)
-                                img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-                                # Undistort and save the image
-                                undistorted_img = undistort_image(camera_intrinsic, distortion_coefficients, img)
-                                pil_image = Image.fromarray(undistorted_img)
-                                mask, _, _ = segmenter.segment(pil_image)
-                                cv2.imwrite(output_path, undistorted_img)
-                                images_list.append(undistorted_img)
-                                # Segment and save the mask
-                                mask_static = 1 - mask # Original mask is dynamic, we need static
-                                mask_uint8 = (mask_static.astype(np.uint8) * 255)
-                                mask_path = os.path.join(mask_output_dir, image_name)
-                                cv2.imwrite(mask_path, mask_uint8)
-                        else:
-                            print(f"Image file {image_path} does not exist.")
+                # --- Loop through each camera channel ---
+                for sensor_channel in sensors:
+                    channel_idx = str(channel_to_idx[sensor_channel]).zfill(1)
+                    camera_token = sample_record['data'][sensor_channel]
+                    camera_data = nusc.get('sample_data', camera_token)
+                    image_path, boxes, _ = nusc.get_sample_data(camera_token)
+                    camera_intrinsic = nusc.get('calibrated_sensor', camera_data['calibrated_sensor_token'])['camera_intrinsic']
+                    distortion_coefficients = nusc.get('calibrated_sensor', camera_data['calibrated_sensor_token'])['distortion_coefficient']
+                    image_name = f"trav_{traversal_idx}_channel_{channel_idx}_img_{img_idx}.jpg"
+                    output_path = os.path.join(image_output_dir, image_name)
+                    if TESTSET:
+                        test_set_img_names.append(image_name)
+                    else:
+                        train_set_img_names.append(image_name)
+                        
+                    # ------------- Read and save the image and mask -------------
+                    if os.path.exists(image_path):
+                        with open(image_path, 'rb') as src_file:
+                            img_array = np.asarray(bytearray(src_file.read()), dtype=np.uint8)
+                            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                            # Undistort and save the image
+                            undistorted_img = undistort_image(camera_intrinsic, distortion_coefficients, img)
+                            pil_image = Image.fromarray(undistorted_img)
+                            mask, _, _ = segmenter.segment(pil_image)
+                            cv2.imwrite(output_path, undistorted_img)
+                            images_list.append(undistorted_img)
+                            # Segment and save the mask
+                            mask_static = 1 - mask # Original mask is dynamic, we need static
+                            mask_uint8 = (mask_static.astype(np.uint8) * 255)
+                            mask_path = os.path.join(mask_output_dir, image_name)
+                            cv2.imwrite(mask_path, mask_uint8)
+                    else:
+                        print(f"Image file {image_path} does not exist.")
 
-                        # ------------- Save the camera extrinsic and intrinsic parameters -------------
-                        # Camera intrinsic parameters
-                        if shared_camera_params is None:
-                            camera_intrinsic = np.array(camera_intrinsic)
-                            fx = camera_intrinsic[0, 0]
-                            fy = camera_intrinsic[1, 1]
-                            cx = camera_intrinsic[0, 2]
-                            cy = camera_intrinsic[1, 2]
-                            h, w = undistorted_img.shape[:2]
-                            shared_camera_params = ("PINHOLE", w, h, [fx, fy, cx, cy])
-                        # Output image-pose pairs
-                        sample_data = nusc.get('sample_data', sample_record['data'][sensor_channel])
-                        calibrated_sensor_token = sample_data['calibrated_sensor_token']
-                        cs_record = nusc.get("calibrated_sensor", calibrated_sensor_token)
-                        cam_ego_rotation = R.from_quat(np.array(cs_record['rotation']),scalar_first=True)
-                        cam_ego_translation = np.array(cs_record['translation'])
-                        # Convert world to camera
-                        cam_translation_world = ego_world_rotation_R.apply(cam_ego_translation) + ego_world_translation
-                        cam_rotation_world = ego_world_rotation_R * cam_ego_rotation
-                        wolrd_cam_rotation = cam_rotation_world.inv()
-                        world_camera_translation = -wolrd_cam_rotation.apply(cam_translation_world)
-                        # Restore corresponding camera's poses
-                        sample_token_to_cam_pose_in_cam_frame[image_name] = np.append(wolrd_cam_rotation.as_quat(scalar_first=True), world_camera_translation)    # key: {sample_token}_{camera_channel};    value: qw, qx, qy, qz, x,y,z
-                        sample_token_to_geo_in_cam_frame[image_name] = cam_translation_world    # key: {sample_token}_{camera_channel};    value: x,y,z
+                    # ------------- Save the camera extrinsic and intrinsic parameters -------------
+                    # Camera intrinsic parameters
+                    if shared_camera_params is None:
+                        camera_intrinsic = np.array(camera_intrinsic)
+                        fx = camera_intrinsic[0, 0]
+                        fy = camera_intrinsic[1, 1]
+                        cx = camera_intrinsic[0, 2]
+                        cy = camera_intrinsic[1, 2]
+                        h, w = undistorted_img.shape[:2]
+                        shared_camera_params = ("PINHOLE", w, h, [fx, fy, cx, cy])
+                    # Output image-pose pairs
+                    sample_data = nusc.get('sample_data', sample_record['data'][sensor_channel])
+                    calibrated_sensor_token = sample_data['calibrated_sensor_token']
+                    cs_record = nusc.get("calibrated_sensor", calibrated_sensor_token)
+                    cam_ego_rotation = R.from_quat(np.array(cs_record['rotation']),scalar_first=True)
+                    cam_ego_translation = np.array(cs_record['translation'])
+                    # Convert world to camera
+                    cam_translation_world = ego_world_rotation_R.apply(cam_ego_translation) + ego_world_translation
+                    cam_rotation_world = ego_world_rotation_R * cam_ego_rotation
+                    wolrd_cam_rotation = cam_rotation_world.inv()
+                    world_camera_translation = -wolrd_cam_rotation.apply(cam_translation_world)
+                    # Restore corresponding camera's poses
+                    sample_token_to_cam_pose_in_cam_frame[image_name] = np.append(wolrd_cam_rotation.as_quat(scalar_first=True), world_camera_translation)    # key: {sample_token}_{camera_channel};    value: qw, qx, qy, qz, x,y,z
+                    sample_token_to_geo_in_cam_frame[image_name] = cam_translation_world    # key: {sample_token}_{camera_channel};    value: x,y,z
 
-                        # ------------- Save video from images -------------
-                        video_name = f'loc_{loc_id}_traversal_{traversal_idx}_video.mp4'
-                        if len(images_list) == len(sensors):
-                            assert all(img.shape == images_list[0].shape for img in images_list)
-                            # Concatenate images horizontally
-                            images_reordered = [images_list[1], images_list[0], images_list[2]]
-                            concatenated_img = cv2.hconcat(images_reordered)
-                            video_output_path = os.path.join(video_output_dir, video_name)
-                            # Initialize video writer if not already done
-                            if video_writer is None:
-                                height, width, _ = concatenated_img.shape
-                                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                                video_writer = cv2.VideoWriter(video_output_path, fourcc, fps, (width, height))
-                            # Write the concatenated image to the video
-                            video_writer.write(concatenated_img)
+                    # ------------- Save video from images -------------
+                    video_name = f'traversal_{traversal_idx}_video.mp4'
+                    if len(images_list) == len(sensors):
+                        assert all(img.shape == images_list[0].shape for img in images_list)
+                        # Concatenate images horizontally
+                        images_reordered = [images_list[1], images_list[0], images_list[2]]
+                        concatenated_img = cv2.hconcat(images_reordered)
+                        video_output_path = os.path.join(video_output_dir, video_name)
+                        # Initialize video writer if not already done
+                        if video_writer is None:
+                            height, width, _ = concatenated_img.shape
+                            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                            video_writer = cv2.VideoWriter(video_output_path, fourcc, fps, (width, height))
+                        # Write the concatenated image to the video
+                        video_writer.write(concatenated_img)
 
-                        # ------------- Save camera parameters and masks for lidar to filter out -------------
-                        R_wc = wolrd_cam_rotation.as_matrix()
-                        t_wc = world_camera_translation
-                        # Used for mask lidar points
-                        list_of_cam_parameters_per_frame.append({
-                            'R_wc': R_wc,
-                            't_wc': t_wc,
-                            'K': camera_intrinsic,
-                            'image_name': image_name,
-                        })
-                        # Mask image 
-                        list_of_masks_per_frame.append(np.array(mask))
+                    # ------------- Save camera parameters and masks for lidar to filter out -------------
+                    R_wc = wolrd_cam_rotation.as_matrix()
+                    t_wc = world_camera_translation
+                    # Used for mask lidar points
+                    list_of_cam_parameters_per_frame.append({
+                        'R_wc': R_wc,
+                        't_wc': t_wc,
+                        'K': camera_intrinsic,
+                        'image_name': image_name,
+                    })
+                    # Mask image 
+                    list_of_masks_per_frame.append(np.array(mask))
 
-                    # ------------- Filter per frame LiDAR points using masks -------------
-                    points_downsampled = filter_lidar_points(points_downsampled, list_of_cam_parameters_per_frame, list_of_masks_per_frame)
-                    infos = visualize_and_collect(
-                        points_downsampled,
-                        list_of_cam_parameters_per_frame,
-                        images_list,
-                        lidar_on_image_debug_dir
-                    )
-                    all_point_infos.extend(infos)
-                    # all_world_lidar_points.append(points_static)
+                # ------------- Filter per frame LiDAR points using masks -------------
+                points_downsampled = filter_lidar_points(points_downsampled, list_of_cam_parameters_per_frame, list_of_masks_per_frame)
+                infos = visualize_and_collect(
+                    points_downsampled,
+                    list_of_cam_parameters_per_frame,
+                    images_list,
+                    lidar_on_image_debug_dir
+                )
+                all_point_infos.extend(infos)
+                # all_world_lidar_points.append(points_static)
 
-            # ------------- Release video writer after each traversal -------------
-            if video_writer is not None:
-                video_writer.release()
+        # ------------- Release video writer after each traversal -------------
+        if video_writer is not None:
+            video_writer.release()
 
     # ------------- Summarize everything after all locations -------------
     print("The number of training set is: ", len(sample_token_to_cam_pose_in_cam_frame)-len(test_set_img_names))
@@ -639,7 +637,7 @@ def main():
     output_dir = '/home/neptune/Data/MARS/city_gs_data/loc6_10_17_multi_trav_voxel_050'
 
     # keys: [[trainset], [testset]]  
-    loc_and_traversals = {6: [[2, 6, 9], []], 10: [[5, 7, 16], []] , 17: [[1, 5, 12], []]}
+
     # loc_and_traversals = {6: [[6], []]}
     # trav 11: [[5], []]
     
