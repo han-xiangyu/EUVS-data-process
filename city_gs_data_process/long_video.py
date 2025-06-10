@@ -17,7 +17,7 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 
-def process_data(output_dir, channel_to_idx, loc_and_traversals, train_sensors, test_sensors, train_sample_ratio, test_sample_ratio):
+def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_sample_ratio, test_sample_ratio):
     # ------------- Set parameters -------------
     lidar_voxel_size = 0.5  # Voxel size for downsampling
     fps = 10
@@ -680,7 +680,7 @@ def main():
             'CAM_SIDE_RIGHT': 6
         }
     
-    process_data(output_dir, channel_to_idx, loc_and_traversals, train_sensors, test_sensors, train_sample_ratio, test_sample_ratio)
+    process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_sample_ratio, test_sample_ratio)
 
 
 if __name__=="__main__":
