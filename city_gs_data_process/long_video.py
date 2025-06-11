@@ -633,7 +633,7 @@ def write_points3D_txt_from_infos(filepath, infos, image_name_to_id, default_err
 
 def main():
 
-    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/xiangyu/data/long_video_processed_downsampled_0.1'
+    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data/long_video_processed_downsampled_0.1'
 
     # keys: [[trainset], [testset]]  
 
