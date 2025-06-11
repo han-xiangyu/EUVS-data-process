@@ -633,7 +633,7 @@ def write_points3D_txt_from_infos(filepath, infos, image_name_to_id, default_err
 
 def main():
 
-    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/xiangyu/data/long_video_processed'
+    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/xiangyu/data/long_video_processed_downsampled_0.1'
 
     # keys: [[trainset], [testset]]  
 
@@ -647,7 +647,7 @@ def main():
     # train_sample_ratio = 0.4
 
 
-    train_sample_ratio = 0.01
+    train_sample_ratio = 0.1
     test_sample_ratio = 0
 
     train_sensors = [
