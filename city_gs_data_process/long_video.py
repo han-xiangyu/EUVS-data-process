@@ -66,7 +66,7 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     trainset_idxes = [2]
     testset_idxes = []
     merged_traversal_idxes = trainset_idxes + testset_idxes
-    nusc = NuScenes(version='v1.1', dataroot=f'/lustre/fsw/portfolios/nvr/users/ymingli/xiangyu/data', verbose=True)
+    nusc = NuScenes(version='v1.1', dataroot=f'/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data', verbose=True)
 
     #  ----------- Loop each traversal -----------
     for traversal_idx in merged_traversal_idxes:
