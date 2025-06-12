@@ -26,4 +26,4 @@ submit_job --gpu 0 --cpu 24 --mem 64 \
     --name $job_name\
     --logdir  $training_logs_dir \
     --notimestamp \
-    --command "bash NV_run.sh"
+    --command "bash /lustre/fsw/portfolios/nvr/users/ymingli/gaussian/code/EUVS-data-process/sbatch_scripts/NV_run.sh"
