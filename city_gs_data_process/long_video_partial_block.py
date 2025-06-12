@@ -73,8 +73,7 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
         my_scene = nusc.scene[traversal_idx]
 
         all_sample_tokens = get_all_sample_tokens(nusc,my_scene['token'])
-        all_sample_tokens = all_sample_tokens[:20000]
-        all_sample_tokens = all_sample_tokens[::2]
+        all_sample_tokens = all_sample_tokens[:10000]
         
         if traversal_idx in trainset_idxes:
             sensors = train_sensors
