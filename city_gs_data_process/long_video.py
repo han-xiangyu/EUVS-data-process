@@ -647,7 +647,7 @@ def main():
     # train_sample_ratio = 0.4
 
 
-    train_sample_ratio = 0.05
+    train_sample_ratio = 0.2
     test_sample_ratio = 0
 
     train_sensors = [
