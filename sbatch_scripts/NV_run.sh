@@ -13,4 +13,4 @@ export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:/usr/lib/x86_64-linux-gnu
 
 cd /lustre/fsw/portfolios/nvr/users/ymingli/gaussian/code/EUVS-data-process
 
-python -m city_gs_data_process.long_video
+python -m city_gs_data_process.long_video_partial_block
