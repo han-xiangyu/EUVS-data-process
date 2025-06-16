@@ -1,6 +1,6 @@
 
 job_name="3DfoundationModelDataProcessPartial6000Downsample"
-training_logs_dir="/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/logs/data_process_partial_6000_downsample"
+training_logs_dir="/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/logs/data_process_partial_6000_lidar_pts_downsample"
 
 ## GPU job
 
