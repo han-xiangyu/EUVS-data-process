@@ -273,41 +273,48 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     image_name_to_id = { name: i+1 for i, name in enumerate(sorted_images) }
     # Aggregate all collected LiDAR points and write to points3D.txt
     if all_point_infos: # Check if the list is not empty
-        TARGET = 16_000_000                # 16_777_216
-        EPS    = 0.01                    # 二分终止精度 (m)
+        TARGET = 2**24 - 1                # 16_777_216
+        # EPS    = 0.01                    # 二分终止精度 (m)
         
-        def voxel_hash_indices(pts, voxel, mins):
-            grid = np.floor((pts - mins) / voxel).astype(np.int64)
-            key  = (grid[:,0]*73856093) ^ (grid[:,1]*19349663) ^ (grid[:,2]*83492791)
-            _, idx = np.unique(key, return_index=True)
-            return idx
+        # def voxel_hash_indices(pts, voxel, mins):
+        #     grid = np.floor((pts - mins) / voxel).astype(np.int64)
+        #     key  = (grid[:,0]*73856093) ^ (grid[:,1]*19349663) ^ (grid[:,2]*83492791)
+        #     _, idx = np.unique(key, return_index=True)
+        #     return idx
         
-        xyz  = np.asarray([i["xyz"] for i in all_point_infos])
-        mins, maxs = xyz.min(0), xyz.max(0)
-        lo, hi = 0.05, np.linalg.norm(maxs - mins)
-        best_idx, best_voxel = None, None
+        # xyz  = np.asarray([i["xyz"] for i in all_point_infos])
+        # mins, maxs = xyz.min(0), xyz.max(0)
+        # lo, hi = 0.05, np.linalg.norm(maxs - mins)
+        # best_idx, best_voxel = None, None
 
-        for _ in range(40):                          # 足够逼近
-            voxel = (lo + hi) / 2
-            idx   = voxel_hash_indices(xyz, voxel, mins)
-            if len(idx) >= TARGET:
-                best_idx, best_voxel = idx, voxel    # 记录最新“满足≥TARGET”的解
-                lo = voxel                           # 体素可再粗一点
-            else:
-                hi = voxel                           # 体素太粗，缩小
-            if hi - lo < EPS:                        # 精度满足
-                break
+        # for _ in range(40):                          # 足够逼近
+        #     voxel = (lo + hi) / 2
+        #     idx   = voxel_hash_indices(xyz, voxel, mins)
+        #     if len(idx) >= TARGET:
+        #         best_idx, best_voxel = idx, voxel    # 记录最新“满足≥TARGET”的解
+        #         lo = voxel                           # 体素可再粗一点
+        #     else:
+        #         hi = voxel                           # 体素太粗，缩小
+        #     if hi - lo < EPS:                        # 精度满足
+        #         break
 
-        if best_idx is None:
-            raise RuntimeError("Point cloud too sparse to reach TARGET")
+        # if best_idx is None:
+        #     raise RuntimeError("Point cloud too sparse to reach TARGET")
 
-        # --- 精确裁剪 ---
-        best_idx.sort()                              # 保证确定性
-        keep_idx = best_idx[:TARGET]                 # 无随机
-        all_point_infos = [all_point_infos[i] for i in keep_idx.tolist()]
+        # # --- 精确裁剪 ---
+        # best_idx.sort()                              # 保证确定性
+        # keep_idx = best_idx[:TARGET]                 # 无随机
+        # all_point_infos = [all_point_infos[i] for i in keep_idx.tolist()]
 
-        print(f"[INFO] 输出精确 {len(all_point_infos)} points "
-            f"(voxel≈{best_voxel:.3f} m)")
+        # print(f"[INFO] 输出精确 {len(all_point_infos)} points "
+        #     f"(voxel≈{best_voxel:.3f} m)")
+        if len(all_point_infos) > TARGET:
+            print(f"[INFO] Too many points ({len(all_point_infos)}), "
+                  f"randomly sampling {TARGET} points.")
+            # Randomly sample TARGET points
+            np.random.seed(42)
+            keep_idx = np.random.choice(len(all_point_infos), TARGET, replace=False)
+            all_point_infos = [all_point_infos[i] for i in keep_idx]
         # Write the aggregated points to points3D.txt
         write_points3D_txt_from_infos(points3d_output_path, all_point_infos, image_name_to_id)
     else:
