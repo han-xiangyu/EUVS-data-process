@@ -275,30 +275,15 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     if all_point_infos: # Check if the list is not empty
         print("Aggregating LiDAR points...")
         print(f"Total aggregated LiDAR points: {len(all_point_infos)}")
-        MAX_POINTS_TOTAL = 2^24 - 1     # 16 777 216
+        MAX_POINTS_TOTAL = 2**24 - 1     # 16 777 216
 
         if len(all_point_infos) > MAX_POINTS_TOTAL:
             xyzs = np.asarray([info["xyz"] for info in all_point_infos])
+            keep_idx, voxel = voxel_subsample_keep_original(xyzs, MAX_POINTS_TOTAL)
 
-            # Estimate global voxel size
-            def estimate_global_voxel(pts, target):
-                mins, maxs = pts.min(0), pts.max(0)
-                vol = np.prod(maxs - mins)
-                return max((vol / target) ** (1/3), 0.5)  # No less than 50 cm
+            all_point_infos = [all_point_infos[i] for i in keep_idx]
 
-            voxel = estimate_global_voxel(xyzs, MAX_POINTS_TOTAL)
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(xyzs)
-            pcd = pcd.voxel_down_sample(voxel)
-
-            kept = set(map(tuple, np.asarray(pcd.points)))
-
-            # Filter all_point_infos
-            all_point_infos = [info for info in all_point_infos
-                            if tuple(info["xyz"]) in kept]
-
-            print(f"[INFO] Twice downsample → {len(all_point_infos)} points "
-                f"(voxel={voxel:.3f} m)")
+            print(f"[INFO] Twice downsample → {len(all_point_infos)} points (voxel={voxel:.3f} m)")
         # Write the aggregated points to points3D.txt
         write_points3D_txt_from_infos(points3d_output_path, all_point_infos, image_name_to_id)
     else:
@@ -325,6 +310,25 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     with open(key_config_path, 'w') as file:
         file.write(json.dumps(key_info, ensure_ascii=False, indent=4))
 
+def voxel_subsample_keep_original(points, target):
+    """
+    返回体素采样后保留下来的“原始点索引”列表，而不是质心。
+    """
+    # 1) 估算体素边长
+    mins, maxs = points.min(0), points.max(0)
+    vol = np.prod(maxs - mins)
+    voxel = max((vol / target) ** (1/3), 0.5)   # ≥ 0.5 m，可调
+    
+    # 2) 计算离散体素坐标
+    grid = np.floor((points - mins) / voxel).astype(np.int64)
+    
+    # 3) 把 (x,y,z) 体素坐标哈希成一维 key
+    #   （用大素数异或，碰撞概率低）
+    key = (grid[:,0] * 73856093) ^ (grid[:,1] * 19349663) ^ (grid[:,2] * 83492791)
+    
+    # 4) 取每个 key 的第一条记录
+    _, unique_idx = np.unique(key, return_index=True)
+    return unique_idx, voxel
 
 def filter_lidar_points_with_tracks(points_world, cam_params_list, masks_list, image_dir):
     """
