@@ -1,7 +1,0 @@
-numpy
-opencv-python
-hydra-core
-transformers
-accelerate
-matplotlib
-scikit-learn

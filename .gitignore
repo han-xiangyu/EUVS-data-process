@@ -1,0 +1,4 @@
+# Python 运行时 / 打包产生的临时文件
+*.pyc
+__pycache__/
+*.egg-info/
