@@ -275,6 +275,30 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     if all_point_infos: # Check if the list is not empty
         print("Aggregating LiDAR points...")
         print(f"Total aggregated LiDAR points: {len(all_point_infos)}")
+        MAX_POINTS_TOTAL = 2^24 - 1     # 16 777 216
+
+        if len(all_point_infos) > MAX_POINTS_TOTAL:
+            xyzs = np.asarray([info["xyz"] for info in all_point_infos])
+
+            # Estimate global voxel size
+            def estimate_global_voxel(pts, target):
+                mins, maxs = pts.min(0), pts.max(0)
+                vol = np.prod(maxs - mins)
+                return max((vol / target) ** (1/3), 0.5)  # No less than 50 cm
+
+            voxel = estimate_global_voxel(xyzs, MAX_POINTS_TOTAL)
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(xyzs)
+            pcd = pcd.voxel_down_sample(voxel)
+
+            kept = set(map(tuple, np.asarray(pcd.points)))
+
+            # Filter all_point_infos
+            all_point_infos = [info for info in all_point_infos
+                            if tuple(info["xyz"]) in kept]
+
+            print(f"[INFO] Twice downsample → {len(all_point_infos)} points "
+                f"(voxel={voxel:.3f} m)")
         # Write the aggregated points to points3D.txt
         write_points3D_txt_from_infos(points3d_output_path, all_point_infos, image_name_to_id)
     else:
