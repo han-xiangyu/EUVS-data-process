@@ -274,7 +274,7 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
     if all_point_infos: # Check if the list is not empty
         print("Aggregating LiDAR points...")
         print(f"Total aggregated LiDAR points: {len(all_point_infos)}")
-        MAX_POINTS_TOTAL = 1 << 24     # 16 777 216
+        MAX_POINTS_TOTAL = 2^24 - 1     # 16 777 216
 
         if len(all_point_infos) > MAX_POINTS_TOTAL:
             xyzs = np.asarray([info["xyz"] for info in all_point_infos])
