@@ -73,7 +73,7 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, train_
         my_scene = nusc.scene[traversal_idx]
 
         all_sample_tokens = get_all_sample_tokens(nusc,my_scene['token'])
-        all_sample_tokens = all_sample_tokens[:10000]
+        all_sample_tokens = all_sample_tokens[:20000]
         
         if traversal_idx in trainset_idxes:
             sensors = train_sensors
@@ -674,7 +674,7 @@ def write_points3D_txt_from_infos(filepath, infos, image_name_to_id, default_err
 
 def main():
 
-    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data/long_video_processed_frames6000_pts_downsample'
+    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data/long_video_processed_frames12000_pts_downsample'
 
     # keys: [[trainset], [testset]]  
 
