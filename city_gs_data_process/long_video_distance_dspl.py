@@ -83,8 +83,8 @@ def process_data(output_dir, channel_to_idx, train_sensors, test_sensors, spatia
             ego_xyz.append(np.array(pose_rec["translation"]))          # (x,y,z)
 
         # ──── 2. 设定参数 ────
-        spatial_step_m    = 0.5        # 物理步长 Δd (米)
-        target_frames   = 8000       # 目标帧数
+        # spatial_step_m    = 0.5        # 物理步长 Δd (米)
+        # target_frames   = 3000       # 目标帧数
         assert target_frames > 0 and spatial_step_m > 0
 
         # ──── 3. 选帧 ────
