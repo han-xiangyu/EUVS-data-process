@@ -1,6 +1,6 @@
 
 job_name="3DfoundationModelDataProcessNew"
-training_logs_dir="/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/logs/long_video_spatial05_sampling9000_true"
+training_logs_dir="/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/logs/long_video_spatial05_sampling6000"
 
 ## GPU job
 

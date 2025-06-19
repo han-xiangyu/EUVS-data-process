@@ -688,7 +688,7 @@ def main():
     # test_sample_ratio = 0
 
     spatial_step_m = 0.5
-    target_frames = 3000 # x3
+    target_frames = 2000 # x3
     train_sensors = [
             'CAM_FRONT_CENTER',
             'CAM_FRONT_LEFT',
