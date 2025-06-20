@@ -670,7 +670,7 @@ def write_points3D_txt_from_infos(filepath, infos, image_name_to_id, default_err
 
 def main():
 
-    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data/long_video_spatial05_frames6000'
+    output_dir = '/lustre/fsw/portfolios/nvr/users/ymingli/gaussian/data/spatial05_frames6000'
 
     # keys: [[trainset], [testset]]  
 
